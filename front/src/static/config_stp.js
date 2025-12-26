@@ -23,12 +23,21 @@ function eventHandlers(currentDevice, modalId) {
     });
     var modalRadios = '#' + modalId + " input[type='radio'][name='config_rstp_stp']";
     $(modalRadios + "[value=\""+currentDevice.config.stp+"\"]").attr('checked','checked')
-    $('#' + modalId).find('#config_stp_priority').val(currentDevice.config.priority)
+    var currentPriority = currentDevice.config.priority;
+    $('#' + modalId).find('#config_stp_priority').val(
+        currentPriority === undefined || currentPriority === null ? '' : currentPriority
+    );
 
     $('#' + modalId).find('#rstpConfigurationSubmit').on('click', function () {
         var rstp_stp_config = $(modalRadios + ":checked").val();
         $('#' + modalId).modal('hide');
         updateRstpButtonStyle(currentDevice, rstp_stp_config);
+
+        // Update MSTP button visibility when STP mode changes
+        currentDevice.config.stp = parseInt(rstp_stp_config);
+        if (typeof updateMstpButtonVisibility === 'function') {
+            updateMstpButtonVisibility(currentDevice);
+        }
 
         var switch_id = currentDevice.data.id;
         $('#' + modalId + ' #modal_switch_id').val(switch_id);
@@ -39,6 +48,19 @@ function eventHandlers(currentDevice, modalId) {
     });
 
     var priorityInput = $('#' + modalId + ' #input_priority_form')[0];
+    var priorityField = $('#' + modalId + ' #config_stp_priority');
+
+    function syncPriorityRange(mode) {
+        if (parseInt(mode) === 3) {
+            priorityField.attr({ min: 0, max: 15, step: 1 });
+            var value = parseInt(priorityField.val(), 10);
+            if (Number.isNaN(value) || value < 0 || value > 15) {
+                priorityField.val(8);
+            }
+        } else {
+            priorityField.attr({ min: 0, max: 65535, step: 1 });
+        }
+    }
 
     document.querySelectorAll(modalRadios).forEach(radio => {
         radio.addEventListener('change', function() {
@@ -47,6 +69,7 @@ function eventHandlers(currentDevice, modalId) {
             } else {
                 priorityInput.style.display = 'block';
             }
+            syncPriorityRange(this.value);
         });
     });
 
@@ -55,6 +78,7 @@ function eventHandlers(currentDevice, modalId) {
     } else {
         priorityInput.style.display = 'none';
     }
+    syncPriorityRange(currentDevice.config.stp);
     updateRstpButtonStyle(currentDevice, currentDevice.config.stp);
 }
 
@@ -66,6 +90,9 @@ function updateRstpButtonStyle(currentDevice, rstp_stp_config) {
         }
         if (rstp_stp_config == 2) {
             $('#config_button_rstp_text').text("RSTP")
+        }
+        if (rstp_stp_config == 3) {
+            $('#config_button_rstp_text').text("MSTP")
         }
         $('#config_button_rstp').addClass('btn-outline-primary').removeClass('btn-outline-secondary');
     } else {
